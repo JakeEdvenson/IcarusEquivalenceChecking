@@ -129,8 +129,9 @@ def generateFirstTestbench(tb, line, tests):
     if "INPUTS" in line:
         i = 0
         while(i < inputNum()):
-            line = "reg [" + str(data["iBitsList"][i] + ":0] " + data["inputList"][i] + " = 0;\n")
-            tb.write(line)
+            if data["inputList"][i] != "clk":
+                line = "reg [" + str(data["iBitsList"][i]) + ":0] " + data["inputList"][i] + " = 0;\n"
+                tb.write(line)
             i = i+1
         line = ""
 
@@ -155,9 +156,11 @@ def generateFirstTestbench(tb, line, tests):
     if "/*SIGNALS" in line:
         i = 0
         while(i < inputNum()):
-            data["randList"].append(np.random.randint(low = 0, high = (2**(int(data["iBitsList"][i]) + 1)-1), size = int(tests)))
+            if data["iBitsList"][i] == 0:
+                data["randList"].append(np.random.randint(low = 0, high = 2, size = int(tests)))
+            else:
+                data["randList"].append(np.random.randint(low = 0, high = (2**(int(data["iBitsList"][i]) + 1)-1), size = int(tests)))
             i=i+1
-        
         i = 0
         j = 0
         while(i < int(tests)):
@@ -181,7 +184,7 @@ def generateFirstTestbench(tb, line, tests):
 #can have different patterns for inputs and outputs, so this makes sure they will still work properly. 
 def generateTestbench(tb, line):
     if fileName[fileNum-1] + "_tb;" in line:
-        line = ("module " + fileName[fileNum] + "_tb;\n")
+        line = line.replace(fileName[fileNum-1], fileName[fileNum])
     
     if fileName[fileNum-1] + "_tb);" in line:
         line = "    $dumpvars(0," + fileName[fileNum] + "_tb);\n"
@@ -197,6 +200,32 @@ def generateTestbench(tb, line):
             i = i + 1
 
     tb.write(line)
+
+def generateFirstTCL():
+    if(exists(PATH + fileName[fileNum] + "/" + fileName[fileNum] + ".tcl")):
+        os.remove(PATH + fileName[fileNum] + "/" + fileName[fileNum] + ".tcl")
+    TCL = open(PATH + fileName[fileNum] + "/" + fileName[fileNum] + ".tcl", "x")
+    i=0
+    line = "set filter [list "
+    while(i < totalNum()):
+        line = line + fileName[fileNum] + "_tb." + str(data["totalList"][i]).strip() + " "
+        i=i+1
+    line = line + "]\n"
+    TCL.write(line)
+    TCL.write("gtkwave::addSignalsFromList $filter\n")
+    TCL.write('gtkwave::/File/Export/Write_VCD_File_As "' + str(PATH) + fileName[fileNum] + "/" + fileName[fileNum] + '.vcd"\n')
+    TCL.write("gtkwave::File/Quit")
+
+def generateTCL():
+    if(exists(PATH + fileName[fileNum] + "/" + fileName[fileNum] + ".tcl")):
+        os.remove(PATH + fileName[fileNum] + "/" + fileName[fileNum] + ".tcl")   
+    TCL = open(PATH + fileName[fileNum] + "/" + fileName[fileNum] + ".tcl", "x")
+    sample = open(PATH + fileName[fileNum-1] + "/" + fileName[fileNum-1] + ".tcl")
+    for line in sample:
+        if fileName[fileNum-1] in line:
+            line = line.replace(fileName[fileNum-1], fileName[fileNum])
+        TCL.write(line)
+
         
 
 #The main function that calls all of the functions above and generates the testbench.
@@ -225,5 +254,9 @@ for x in file:
 
     sample.close()
     tb.close()
+    if (fileNum == 0):
+        generateFirstTCL()
+    else:
+        generateTCL()
     data = refresh(data) #Sets the data structure back to it's initial state so the next file parsed can store data there.
     fileNum = fileNum + 1 #Increments to the next file.
