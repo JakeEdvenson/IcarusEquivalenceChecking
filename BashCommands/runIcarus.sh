@@ -26,8 +26,18 @@ if test -f "/home/edvenson/Icarus-Tests/Tests/$var3/$var4.v"; then
                 iverilog -o /home/edvenson/Icarus-Tests/Tests/$var5/dsn /home/edvenson/Icarus-Tests/Tests/$var5/*_tb.v /home/edvenson/Icarus-Tests/Tests/$var5/$var5.v /home/edvenson/Icarus-Tests/Tests/cells_sim.v
                 vvp /home/edvenson/Icarus-Tests/Tests/$var5/dsn
                 mv *.vcd /home/edvenson/Icarus-Tests/Tests/$var5/test.vcd
-                gtkwave -o /home/edvenson/Icarus-Tests/Tests/$var3/test.vcd &
-                gtkwave -o /home/edvenson/Icarus-Tests/Tests/$var5/test.vcd 
+                gtkwave -T /home/edvenson/Icarus-Tests/Tests/$var3/$var3.tcl -o /home/edvenson/Icarus-Tests/Tests/$var3/test.vcd &
+                gtkwave -T /home/edvenson/Icarus-Tests/Tests/$var5/$var5.tcl -o /home/edvenson/Icarus-Tests/Tests/$var5/test.vcd 
+                rm "/home/edvenson/Icarus-Tests/Difference_Check/diff.txt"
+                diff /home/edvenson/Icarus-Tests/Tests/$var5/$var5.vcd /home/edvenson/Icarus-Tests/Tests/$var3/$var3.vcd >> "/home/edvenson/Icarus-Tests/Difference_Check/diff.txt"
+                python /home/edvenson/Icarus-Tests/Difference_Check/check_difference.py
+                rm /home/edvenson/Icarus-Tests/Tests/$var3/*.vcd
+                rm /home/edvenson/Icarus-Tests/Tests/$var3/dsn
+                rm /home/edvenson/Icarus-Tests/Tests/$var3/test.vcd.fst
+                rm /home/edvenson/Icarus-Tests/Tests/$var5/test.vcd
+                rm /home/edvenson/Icarus-Tests/Tests/$var5/dsn
+                rm /home/edvenson/Icarus-Tests/Tests/$var5/*.vcd
+                rm /home/edvenson/Icarus-Tests/Tests/$var5/test.vcd.fst
                 exit
             fi
         fi
@@ -42,26 +52,29 @@ iverilog -o /home/edvenson/Icarus-Tests/Tests/$var3/dsn /home/edvenson/Icarus-Te
 
 vvp /home/edvenson/Icarus-Tests/Tests/$var3/dsn
 
-mv *.vcd /home/edvenson/Icarus-Tests/Tests/$var3/test.vcd
+mv test.vcd /home/edvenson/Icarus-Tests/Tests/$var3/test.vcd
 
 iverilog -o /home/edvenson/Icarus-Tests/Tests/$var5/dsn /home/edvenson/Icarus-Tests/Tests/$var5/*_tb.v /home/edvenson/Icarus-Tests/Tests/$var5/$var5.v /home/edvenson/Icarus-Tests/Tests/cells_sim.v
 
 vvp /home/edvenson/Icarus-Tests/Tests/$var5/dsn
 
-mv *.vcd /home/edvenson/Icarus-Tests/Tests/$var5/test.vcd
+mv test.vcd /home/edvenson/Icarus-Tests/Tests/$var5/test.vcd
 
 #Runs both the goldenfile and the reversed-netlist in waveform. 
-gtkwave -o /home/edvenson/Icarus-Tests/Tests/$var3/test.vcd &
-gtkwave -o /home/edvenson/Icarus-Tests/Tests/$var5/test.vcd 
+gtkwave -T /home/edvenson/Icarus-Tests/Tests/$var3/$var3.tcl -o /home/edvenson/Icarus-Tests/Tests/$var3/test.vcd &
+gtkwave -T /home/edvenson/Icarus-Tests/Tests/$var5/$var5.tcl -o /home/edvenson/Icarus-Tests/Tests/$var5/test.vcd 
+rm "/home/edvenson/Icarus-Tests/Difference_Check/diff.txt"
+diff /home/edvenson/Icarus-Tests/Tests/$var5/$var5.vcd /home/edvenson/Icarus-Tests/Tests/$var3/$var3.vcd >> "/home/edvenson/Icarus-Tests/Difference_Check/diff.txt"
+python /home/edvenson/Icarus-Tests/Difference_Check/check_difference.py
 
 #Removes the excess wave files for convenience. Can be disabled if you want to review a file later. 
-rm /home/edvenson/Icarus-Tests/Tests/$var1/test.vcd
-rm /home/edvenson/Icarus-Tests/Tests/$var1/dsn
-rm /home/edvenson/Icarus-Tests/Tests/$var1/test.vcd.fst
-rm /home/edvenson/Icarus-Tests/Tests/$var3/test.vcd
+#rm /home/edvenson/Icarus-Tests/Tests/$var1/test.vcd
+#rm /home/edvenson/Icarus-Tests/Tests/$var1/dsn
+#rm /home/edvenson/Icarus-Tests/Tests/$var1/test.vcd.fst
+rm /home/edvenson/Icarus-Tests/Tests/$var3/*.vcd
 rm /home/edvenson/Icarus-Tests/Tests/$var3/dsn
 rm /home/edvenson/Icarus-Tests/Tests/$var3/test.vcd.fst
-rm /home/edvenson/Icarus-Tests/Tests/$var5/test.vcd
+rm /home/edvenson/Icarus-Tests/Tests/$var5/*.vcd
 rm /home/edvenson/Icarus-Tests/Tests/$var5/dsn
 rm /home/edvenson/Icarus-Tests/Tests/$var5/test.vcd.fst
 
