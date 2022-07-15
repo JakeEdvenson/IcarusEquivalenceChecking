@@ -1,443 +1,229 @@
-#NOTE: This file is an extremely rough draft. It's more a proof of concept rather than what will actually be included with bfasst. 
-#Assumptions made by this script: Every input is defined in a new line. In other words, THIS is not allowed:
-# input wire [5:0] input1, input2;
-# We also assume that the bit range ends at 0, so we wouldnt see something like [6:1] or [15:12].
-
 from random import randint
-import time
 import sys
 import os
 from os.path import exists
 import numpy as np
 
-fileName = []
-increment = 0
-for x in sys.argv:
-    if(increment != 0):
-        fileName.append(x)
-    increment = increment + 1
+#A basic data structure to store the parameters from the verilog file as well as their bit sizes.
+data = {
+    "inputList": [],
+    "iBitsList": [],
+    "outputList": [],
+    "oBitsList": [],
+    "totalList": [],
+    "randList": []
+}
 
-file = []
-for x in fileName:
-    file.append(open("/home/edvenson/Icarus-Tests/Tests/" + str(x) + "/" + str(x) + ".v"))
-inputNum = 0
-outputNum = 0
-totalNum = 0
-fileNum = 0
-inputList = []
-outputList = []
-bitsList = []
-oBitsList = []
-setList = []
+fileName = [] #Stores every filename input as an argument.
+file = [] #Stores each file path that needs to be opened.
+fileNum = 0 #Keeps track of which file is being accessed at a given time.
+PATH = "/home/edvenson/Icarus-Tests/Tests/" #CHANGE THIS TO THE LOCAL PATH TO YOUR VERILOG DESIGN DIRECTORY
+SAMPLE_PATH = "/home/edvenson/Icarus-Tests/sample_tb.v" #CHANGE THIS TO WHERE THE SAMPLE_TB.V FILE IS STORED
 
-#This logic will read in the inputs from the file.
-#note: Logic can be added later to parse for if there is a ',' in the line. 
-for y in file:
-    totalList = []
-    for line in y:
-        if (line.find("//",0,2) == -1):
-            if "input" in line:
-                if "]" in line:
-                    if(line[line.index("]")+1] == " "):
-                        print(line)
-                        if ";" in line:
-                            inputList.append(line[line.index("]") + 2 : line.index(";")])
-                            totalList.append(line[line.index("]") + 2 : line.index(";")])
-                        elif "," in line:
-                            inputList.append(line[line.index("]") + 2 : line.index(",")])
-                            totalList.append(line[line.index("]") + 2 : line.index(",")])
-                        else:
-                            inputList.append(line[line.index("]") + 2 : line.index("\n")])
-                            totalList.append(line[line.index("]") + 2 : line.index("\n")])                                                 
-                    else:
-                        if ";" in line:
-                            inputList.append(line[line.index("]") + 1 : line.index(";")])
-                            totalList.append(line[line.index("]") + 1 : line.index(";")])
-                        elif "," in line:
-                            inputList.append(line[line.index("]") + 1 : line.index(",")])
-                            totalList.append(line[line.index("]") + 1 : line.index(",")])
-                        else:
-                            inputList.append(line[line.index("]") + 1 : line.index("\n")])
-                            totalList.append(line[line.index("]") + 1 : line.index("\n")])                                           
-                    bitsList.append(int(line[line.index("[") + 1 : line.index(":")]))
-                    print("Input: " + inputList[inputNum] + " has " + str(bitsList[inputNum] + 1) + " bits.")
-                    inputNum = inputNum + 1
-                    totalNum = totalNum + 1
-                elif "wire" in line:
-                    if ";" in line:
-                        inputList.append(line[line.index("e") + 2 : line.index(";")])
-                        totalList.append(line[line.index("e") + 2 : line.index(";")])
-                    elif "," in line:
-                        inputList.append(line[line.index("e") + 2 : line.index(",")])
-                        totalList.append(line[line.index("e") + 2 : line.index(",")]) 
-                    else:
-                        inputList.append(line[line.index("e") + 2 : line.index("\n")])
-                        totalList.append(line[line.index("e") + 2 : line.index("\n")])    
-                    bitsList.append(0)
-                    print("Input: " + inputList[inputNum] + " has " + str(bitsList[inputNum] + 1) + "bits.")
-                    inputNum = inputNum + 1
-                    totalNum = totalNum + 1
-                elif "reg" in line:
-                    if ";" in line:
-                        inputList.append(line[line.index("g") + 2 : line.index(";")])
-                        totalList.append(line[line.index("g") + 2 : line.index(";")])
-                    elif "," in line:
-                        inputList.append(line[line.index("g") + 2 : line.index(",")])
-                        totalList.append(line[line.index("g") + 2 : line.index(",")]) 
-                    else:
-                        inputList.append(line[line.index("g") + 2 : line.index("\n")])
-                        totalList.append(line[line.index("g") + 2 : line.index("\n")])                                         
-                    bitsList.append(0)
-                    print("Input: " + inputList[inputNum] + " has " + str(bitsList[inputNum] + 1) + " bits.")
-                    totalNum = totalNum + 1
-                    inputNum = inputNum + 1 
-                else:
-                    if ";" in line:
-                        inputList.append(line[line.index("input") + 6 : line.index(";")])
-                        totalList.append(line[line.index("input") + 6 : line.index(";")])
-                    elif "," in line:
-                        inputList.append(line[line.index("input") + 6 : line.index(",")])
-                        totalList.append(line[line.index("input") + 6 : line.index(",")])
-                    else:
-                        inputList.append(line[line.index("input") + 6 : line.index("\n")])
-                        totalList.append(line[line.index("input") + 6 : line.index("\n")])                                    
-                    bitsList.append(0)
-                    print("Input: " + inputList[inputNum] + " has " + str(bitsList[inputNum] + 1) + "bits.")
-                    inputNum = inputNum + 1
-                    totalNum = totalNum + 1
+#A function that will reset all data inside the data structure for future files to fill up.
+def refresh(data):
+    data.clear()
+    data = {
+        "inputList": [],
+        "iBitsList": [],
+        "outputList": [],
+        "oBitsList": [],
+        "totalList": [],
+        "randList": []
+    }
+    return data
 
-            elif "output" in line:
-                if "]" in line:
-                    if(line[line.index("]")+1] == " "):
-                        if ";" in line:
-                            outputList.append(line[line.index("]") + 2 : line.index(";")])
-                            totalList.append(line[line.index("]") + 2 : line.index(";")]) 
-                        elif "," in line:
-                            outputList.append(line[line.index("]") + 2 : line.index(",")])
-                            totalList.append(line[line.index("]") + 2 : line.index(",")])
-                        else:
-                            outputList.append(line[line.index("]") + 2 : line.index("\n")])
-                            totalList.append(line[line.index("]") + 2 : line.index("\n")])                                                 
-                    else:
-                        if ";" in line:
-                            outputList.append(line[line.index("]") + 1 : line.index(";")])
-                            totalList.append(line[line.index("]") + 1 : line.index(";")]) 
-                        elif "," in line:
-                            outputList.append(line[line.index("]") + 1 : line.index(",")])
-                            totalList.append(line[line.index("]") + 1 : line.index(",")])
-                        else:
-                            outputList.append(line[line.index("]") + 1 : line.index("\n")])
-                            totalList.append(line[line.index("]") + 1 : line.index("\n")]) 
-                    oBitsList.append(int(line[line.index("[") + 1 : line.index(":")]))
-                    print("Output: " + outputList[outputNum] + " has " + str(oBitsList[outputNum] + 1) + " bits.")
-                    totalNum = totalNum + 1
-                    outputNum = outputNum + 1
-                elif "wire" in line:
-                    if ";" in line:
-                        outputList.append(line[line.index("e") + 2 : line.index(";")])
-                        totalList.append(line[line.index("e") + 2 : line.index(";")]) 
-                    elif "," in line:
-                        outputList.append(line[line.index("e") + 2 : line.index(",")])
-                        totalList.append(line[line.index("e") + 2 : line.index(",")])   
-                    else:
-                        outputList.append(line[line.index("e") + 2 : line.index("\n")])
-                        totalList.append(line[line.index("e") + 2 : line.index("\n")])                      
-                    oBitsList.append(0)
-                    print("Output: " + outputList[outputNum] + " has " + str(oBitsList[outputNum] + 1) + " bits.")
-                    totalNum = totalNum + 1
-                    outputNum = outputNum + 1
-                elif "reg" in line:
-                    if ";" in line:
-                        outputList.append(line[line.index("g") + 2 : line.index(";")])
-                        totalList.append(line[line.index("g") + 2 : line.index(";")]) 
-                    elif "," in line:
-                        outputList.append(line[line.index("g") + 2 : line.index(",")])
-                        totalList.append(line[line.index("g") + 2 : line.index(",")])  
-                    else:
-                        outputList.append(line[line.index("g") + 2 : line.index("\n")])
-                        totalList.append(line[line.index("g") + 2 : line.index("\n")])                       
-                    oBitsList.append(0)
-                    print("Output: " + outputList[outputNum] + " has " + str(oBitsList[outputNum] + 1) + " bits.")
-                    totalNum = totalNum + 1
-                    outputNum = outputNum + 1            
+#Returns the sizes of input, output, and the total list.
+def inputNum():
+    return(len(data["inputList"]))
 
-                else:
-                    print(line)
-                    if ";" in line:
-                        outputList.append(line[line.index("output") + 7 : line.index(";")])
-                        totalList.append(line[line.index("output") + 7 : line.index(";")]) 
-                    elif "," in line:
-                        outputList.append(line[line.index("output") + 7 : line.index(",")])
-                        totalList.append(line[line.index("output") + 7 : line.index(",")])
-                    else:
-                        outputList.append(line[line.index("output") + 7 : line.index("\n")])
-                        totalList.append(line[line.index("output") + 7 : line.index("\n")])                                      
-                    oBitsList.append(0)
-                    print("Output: " + outputList[outputNum] + " has " + str(oBitsList[outputNum] + 1) + " bits.")
-                    totalNum = totalNum + 1
-                    outputNum = outputNum + 1
+def outputNum():
+    return(len(data["outputList"]))
 
-    index = 0
-    testIndex = 0
+def totalNum():
+    return(len(data["inputList"]) + len(data["outputList"]))
 
-    if(exists("/home/edvenson/Icarus-Tests/Tests/" + fileName[fileNum] + "/" + fileName[fileNum] + "_tb.v")):
-        print("File already exists!")
-        delete = input("Create a new one?\n0 for no, 1 for yes")
-        if(int(delete)):
-            os.remove("/home/edvenson/Icarus-Tests/Tests/" + fileName[fileNum] + "/" + fileName[fileNum] + "_tb.v")
-            index = 0
-            testIndex = 0
-            inputIndex = 0
-            outputIndex = 0
-            if fileNum == 0:
-                tests = input("How many tests would you like to run?\nPlease input a number")
-            tb = open("/home/edvenson/Icarus-Tests/Tests/" + fileName[fileNum] + "/" + fileName[fileNum] + "_tb.v", "x")
-            if fileNum == 0:
-                sample = open("/home/edvenson/Icarus-Tests/sample_tb.v")
-            else:
-                sample = open("/home/edvenson/Icarus-Tests/Tests/" + fileName[fileNum-1] + "/" + fileName[fileNum-1] + "_tb.v")
-            if fileNum == 0:
-                for line in sample:
+#A function to parse the arguments passed into the file and then open the files they point to. 
+def openFiles():
+    i = 0
+    for x in sys.argv:
+        if(i != 0):
+            fileName.append(x)
+        i = i + 1
+    
+    for x in fileName:
+        file.append(open(PATH + str(x) + "/" + str(x) + ".v"))
 
-                    if "TB_NAME;" in line:
-                        line = ("module " + fileName[0] + "_tb;")
-                        tb.write(line)
-                        line = "\n"
+#A function for retrieving part of the line.
+def appendLine(line, start, num, stop):
+    return((line[line.index(start) + num : line.index(stop)]))
 
-                    if "TB_NAME)" in line:
-                        line =("    $dumpvars(0," + fileName[0] + "_tb);")
-                        tb.write(line)
-                        line = ""
-
-                    if "INPUTS" in line:
-                        while(index < inputNum):
-                            line = "    reg [" + str(bitsList[index]) + ":0] " + inputList[index] + " = 0;\n"
-                            tb.write(line)
-                            index = index+1
-                        line = ""
-                        index = 0
-
-                    if "OUTPUTS" in line:
-                        while(index < outputNum):
-                            line = "    wire [" + str(oBitsList[index]) + ":0] " + outputList[index] + ";\n"
-                            tb.write(line)
-                            index = index + 1
-                        line = ""
-                        index = 0
-
-                    if "MODULE_NAME" in line:
-                        line = fileName[fileNum] + " instanceOf ("
-                        while(index < totalNum):
-                            if(index == totalNum -1):
-                                line = line + totalList[index] + ");"
-                            else:
-                                line = line + totalList[index] + ", "
-                            index = index + 1
-                        index = 0
-
-                    if "/*SIGNALS" in line:
-                        while(index < inputNum):
-                            setList.append(np.random.randint(low = 0, high = (2**((bitsList[index])+1)-1), size = int(tests)))
-                            index = index + 1
-                        index = 0
-                        textIndex = 0
-                        tb.write("\n")
-                        while(testIndex < int(tests)):
-                            while(index < inputNum):
-                                if(index == 0):
-                                    line = "    # 5 " + str(inputList[index]) + " = " + str(setList[index][testIndex]) + ";\n"
-                                else:
-                                    line = "    " + str(inputList[index]) + " = " + str(setList[index][testIndex]) + ";\n"
-                                index = index+1
-                                tb.write(line)       
-                            index = 0
-                            testIndex = testIndex+1
-                            tb.write("\n")
-                        line = "    # 5 $finish;"         
-
-                    tb.write(line)
-                fileNum = fileNum + 1
-                inputNum = 0
-                outputNum = 0
-                totalNum = 0
-                inputList.clear
-                outputList.clear
-                del totalList
-                bitsList.clear
-                oBitsList.clear
-                setList.clear
-                sample.close()
-                tb.close()    
-            else:
-                for line in sample:
-                    if fileName[fileNum-1] + "_tb;" in line:
-                        line = ("module " + fileName[fileNum] + "_tb;\n")
-
-                    if fileName[fileNum-1] + "_tb);" in line:
-                        line =("    $dumpvars(0," + fileName[fileNum] + "_tb);\n")
-
-                    if "    reg [" in line:
-                        line = "    reg [" + str(bitsList[inputIndex]) + ":0] " + inputList[inputIndex] + " = 0;\n"
-                        inputIndex = inputIndex + 1
-                        tb.write(line)
-                        line = ""
-
-                    if "    wire [" in line:
-                        line = "    wire [" + str(oBitsList[outputIndex]) + ":0] " + outputList[outputIndex] + ";\n"
-                        outputIndex = outputIndex + 1
-                        tb.write(line)
-                        line = ""
-
-                    if fileName[fileNum-1] + " instanceOf (" in line:
-                        print(totalList)
-                        line = fileName[fileNum] + " instanceOf ("
-                        while(index < totalNum):
-                            if(index == totalNum -1):
-                                line = line + totalList[index] + ");"
-                            else:
-                                line = line + totalList[index] + ", "
-                            index = index + 1
-                        index = 0
-                        tb.write(line)
-                        line = "\n"
-                    tb.write(line)
-                fileNum = fileNum + 1
-                inputNum = 0
-                outputNum = 0
-                totalNum = 0
-                inputIndex = 0
-                outputIndex = 0
-                inputList.clear
-                outputList.clear
-                del totalList
-                bitsList.clear
-                oBitsList.clear
-                setList.clear
-                sample.close()
-                tb.close()   
+#A function to confirm where the parser needs to stop getting the input/output name.
+def checkEndChar(line, start, num, isInput, oneBit):
+    if isInput:
+        if ";" in line:
+            data["inputList"].append(appendLine(line, start, num, ";"))
+        elif "," in line:
+            data["inputList"].append(appendLine(line, start, num, ","))
         else:
-            print("Ok")
+            data["inputList"].append(appendLine(line, start, num, "\n"))
+        if oneBit:
+            data["iBitsList"].append(0)
+        else:
+            data["iBitsList"].append(appendLine(line, "[", 1, ":"))  
+        data["totalList"].append(data["inputList"][inputNum()-1])
     else:
-        index = 0
-        testIndex = 0
-        if fileNum == 0:
-            tests = input("How many tests would you like to run?\nPlease input a number")
-        tb = open("/home/edvenson/Icarus-Tests/Tests/" + fileName[fileNum] + "/" + fileName[fileNum] + "_tb.v", "x")
-        if fileNum == 0:
-            sample = open("/home/edvenson/Icarus-Tests/sample_tb.v")
+        if ";" in line:
+            data["outputList"].append(appendLine(line, start, num, ";"))
+        elif "," in line:
+            data["outputList"].append(appendLine(line, start, num, ","))
         else:
-            sample = open("/home/edvenson/Icarus-Tests/Tests/" + fileName[fileNum-1] + "/" + fileName[fileNum-1] + "_tb.v")
-        if fileNum == 0:
-            for line in sample:
-
-                if "TB_NAME;" in line:
-                    line = ("module " + fileName[0] + "_tb;")
-
-                if "TB_NAME)" in line:
-                    line =("    $dumpvars(0," + fileName[0] + "_tb);")
-
-                if "INPUTS" in line:
-                    while(index < inputNum):
-                        line = "    reg [" + str(bitsList[index]) + ":0] " + inputList[index] + " = 0;\n"
-                        tb.write(line)
-                        index = index+1
-                    line = ""
-                    index = 0
-
-                if "OUTPUTS" in line:
-                    while(index < outputNum):
-                        line = "    wire [" + str(oBitsList[index]) + ":0] " + outputList[index] + ";\n"
-                        tb.write(line)
-                        index = index + 1
-                    line = ""
-                    index = 0
-
-                if "MODULE_NAME" in line:
-                    line = fileName[fileNum] + " instanceOf ("
-                    while(index < totalNum):
-                        if(index == totalNum -1):
-                            line = line + totalList[index] + ");"
-                        else:
-                            line = line + totalList[index] + ", "
-                        index = index + 1
-                    index = 0
-
-                if "/*SIGNALS" in line:
-                    while(index < inputNum):
-                        setList.append(np.random.randint(low = 0, high = (2**((bitsList[index])+1)-1), size = int(tests)))
-                        index = index + 1
-                    index = 0
-                    textIndex = 0
-                    tb.write("\n")
-                    while(testIndex < int(tests)):
-                        while(index < inputNum):
-                            if(index == 0):
-                                line = "    # 5 " + str(inputList[index]) + " = " + str(setList[index][testIndex]) + ";\n"
-                            else:
-                                line = "    " + str(inputList[index]) + " = " + str(setList[index][testIndex]) + ";\n"
-                            index = index+1
-                            tb.write(line)       
-                        index = 0
-                        testIndex = testIndex+1
-                        tb.write("\n")
-                    line = "    # 5 $finish;"         
-
-                tb.write(line)
-            fileNum = fileNum + 1
-            inputNum = 0
-            outputNum = 0
-            totalNum = 0
-            inputList.clear
-            outputList.clear
-            totalList.clear
-            bitsList.clear
-            oBitsList.clear
-            setList.clear
-            sample.close()
-            tb.close()    
+            data["outputList"].append(appendLine(line, start, num, "\n"))
+        if oneBit:
+            data["oBitsList"].append(0)
         else:
-            for line in sample:
-                if fileName[fileNum-1] + "_tb;" in line:
-                    line = ("module " + fileName[fileNum] + "_tb;")
+            data["oBitsList"].append(appendLine(line, "[", 1, ":"))  
+        data["totalList"].append(data["outputList"][outputNum()-1])
 
-                if fileName[fileNum-1] + "_tb);" in line:
-                    line =("    $dumpvars(0," + fileName[fileNum] + "_tb);")
+#A function to find out what the input/output name is and at which index to start finding the name.
+def findType(line, isInput):
+    if "]" in line:
+        if(line[line.index("]")+1].isspace()):
+            checkEndChar(line, "]", 2, isInput, False)
+        else:
+            checkEndChar(line, "]", 1, isInput, False)
+    
+    elif "wire" in line:
+        checkEndChar(line, "e", 2, isInput, True)
 
-                if "    reg [" in line:
-                    while(index < inputNum):
-                        line = "    reg [" + str(bitsList[index]) + ":0] " + inputList[index] + " = 0;\n"
-                        tb.write(line)
-                        index = index+1
-                    line = ""
-                    index = 0
+    elif "reg" in line:
+        checkEndChar(line, "g", 2, isInput, True)
 
-                if "    wire [" in line:
-                    while(index < outputNum):
-                        line = "    wire [" + str(oBitsList[index]) + ":0] " + outputList[index] + ";\n"
-                        tb.write(line)
-                        index = index + 1
-                    line = ""
-                    index = 0
+    else:
+        if(isInput):
+            checkEndChar(line, "input", 6, isInput, True) 
+        else:
+            checkEndChar(line, "output", 6, isInput, True) 
 
-                if fileName[fileNum-1] + " instanceOf (" in line:
-                    line = fileName[fileNum] + " instanceOf ("
-                    while(index < totalNum):
-                        if(index == totalNum -1):
-                            line = line + totalList[index] + ");"
-                        else:
-                            line = line + totalList[index] + ", "
-                        index = index + 1
-                    index = 0
+#A function that checks whether the line is a comment or not, then finds if inputs or outputs are in the line.
+#If they are, it calls the other functions to fully parse the line for the names of the inputs/outputs. 
+def parseLine(line):
+    if (line.find("//", 0, 2) == -1):
+        if "input" in line:
+            findType(line, True)
+        if "output" in line:
+            findType(line, False)
+
+#A function to generate the intitial testbench. This function takes a sample testbench, fills in missing
+#portions with data parsed earlier, and then adds in randomly generated data for the inputs to be set
+#equal to every 5 ns.
+def generateFirstTestbench(tb, line, tests):
+    if "TB_NAME;" in line:
+        line = ("module " + fileName[0] + "_tb;")
+        tb.write(line)
+        line = "\n"
+    
+    if "TB_NAME)" in line:
+        line=("    $dumpvars(0," + fileName[0] + "_tb);\n")
+    
+    if "INPUTS" in line:
+        i = 0
+        while(i < inputNum()):
+            line = "reg [" + str(data["iBitsList"][i] + ":0] " + data["inputList"][i] + " = 0;\n")
+            tb.write(line)
+            i = i+1
+        line = ""
+
+    if "OUTPUTS" in line:
+        i = 0
+        while(i < outputNum()):
+            line = "wire [" + str(data["oBitsList"][i]) + ":0] " + data["outputList"][i] + ";\n"
+            tb.write(line)
+            i=i+1
+        line = ""
+    
+    if "MODULE_NAME" in line:
+        i = 0
+        line = fileName[0] + " instanceOf ("
+        while(i < totalNum()):
+            if(i == totalNum() - 1):
+                line = line + data["totalList"][i] + ");\n"
+            else:
+                line = line + data["totalList"][i] + ", "
+            i = i + 1
+
+    if "/*SIGNALS" in line:
+        i = 0
+        while(i < inputNum()):
+            data["randList"].append(np.random.randint(low = 0, high = (2**(int(data["iBitsList"][i]) + 1)-1), size = int(tests)))
+            i=i+1
+        
+        i = 0
+        j = 0
+        while(i < int(tests)):
+            while(j < inputNum()):
+                if(j == 0):
+                    line = "    # 5 " + str(data["inputList"][j]) + " = " + str(data["randList"][j][i]) + ";\n"
+                else:
+                    line = "    " + str(data["inputList"][j]) + " = " + str(data["randList"][j][i]) + ";\n"
+                j=j+1
                 tb.write(line)
-            fileNum = fileNum + 1
-            inputNum = 0
-            outputNum = 0
-            totalNum = 0
-            inputList.clear
-            outputList.clear
-            totalList.clear
-            bitsList.clear
-            oBitsList.clear
-            setList.clear
-            sample.close()
-            tb.close()    
+            j=0
+            i=i+1
+            tb.write("\n")
+        line = "    # 5 $finish;"
+
+    tb.write(line)
+
+#This function takes the last test bench generated and changes all references to inputs, outputs, and everything else to
+#what was found in the most recent file. This is done to preserve the random numbers from the first testbench so that
+#each file can be compared to each other. The instanceOf module is fixed because reversed-netlists and golden-netlists
+#can have different patterns for inputs and outputs, so this makes sure they will still work properly. 
+def generateTestbench(tb, line):
+    if fileName[fileNum-1] + "_tb;" in line:
+        line = ("module " + fileName[fileNum] + "_tb;\n")
+    
+    if fileName[fileNum-1] + "_tb);" in line:
+        line = "    $dumpvars(0," + fileName[fileNum] + "_tb);\n"
+    
+    if fileName[fileNum-1] + " instanceOf (" in line:
+        line = fileName[fileNum] + " instanceOf ("
+        i = 0
+        while(i < totalNum()):
+            if(i == totalNum() - 1):
+                line = line + data["totalList"][i] + ");\n"
+            else:
+                line = line + data["totalList"][i] + ", "
+            i = i + 1
+
+    tb.write(line)
+        
+
+#The main function that calls all of the functions above and generates the testbench.
+
+openFiles() 
+
+for x in file:
+    for line in x:
+        parseLine(line)
+
+    if(exists(PATH + fileName[fileNum] + "/" + fileName[fileNum] + "_tb.v")): #Removes the previously generated testbench if it exists.
+        os.remove(PATH + fileName[fileNum] + "/" + fileName[fileNum] + "_tb.v")
+
+    if fileNum == 0: #Number of tests is only asked once because all future testbenches generated must have the same number of tests w/ the same values
+        tests = input("How many tests would you like to run?\nPlease enter a number: ")
+        sample = open(SAMPLE_PATH)
+    else:
+        sample = open(PATH + fileName[fileNum-1] + "/" + fileName[fileNum-1] + "_tb.v")
+    tb = open(PATH + fileName[fileNum] + "/" + fileName[fileNum] + "_tb.v", "x")
+
+    for line in sample:
+        if(fileNum == 0):
+            generateFirstTestbench(tb, line, tests)
+        else:
+            generateTestbench(tb, line)
+
+    sample.close()
+    tb.close()
+    data = refresh(data) #Sets the data structure back to it's initial state so the next file parsed can store data there.
+    fileNum = fileNum + 1 #Increments to the next file.
