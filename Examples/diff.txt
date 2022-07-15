@@ -1,3 +1,7 @@
+THIS IS WHAT A TYPICAL DIFFERENCE CHECKER OUTPUT IS.
+Note: seeing $scope module _____ $end is normal because we are comparing 2 different module names (reversed and implicit.)
+If we see more than 4 lines in this file, we know the design must be unequivalent in some way.
+
 10c10
 < $scope module regfile_reversed_tb $end
 ---
