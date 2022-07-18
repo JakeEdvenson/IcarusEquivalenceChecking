@@ -1,8 +1,10 @@
+import os
 from random import randint
 import sys
 import os
 from os.path import exists
 import numpy as np
+import spydrnet as sdn
 
 #A basic data structure to store the parameters from the verilog file as well as their bit sizes.
 data = {
@@ -54,65 +56,49 @@ def openFiles():
     for x in fileName:
         file.append(open(PATH + str(x) + "/" + str(x) + ".v"))
 
-#A function for retrieving part of the line.
-def appendLine(line, start, num, stop):
-    return((line[line.index(start) + num : line.index(stop)]))
+#Parses the file using spydrnet to find the inputs and outputs and their bit sizes. 
+def parse(file):
+    netlist = sdn.parse(file)
+    library = netlist.libraries[0]
+    definition = library.definitions[0]
 
-#A function to confirm where the parser needs to stop getting the input/output name.
-def checkEndChar(line, start, num, isInput, oneBit):
-    if isInput:
-        if ";" in line:
-            data["inputList"].append(appendLine(line, start, num, ";"))
-        elif "," in line:
-            data["inputList"].append(appendLine(line, start, num, ","))
-        else:
-            data["inputList"].append(appendLine(line, start, num, "\n"))
-        if oneBit:
-            data["iBitsList"].append(0)
-        else:
-            data["iBitsList"].append(appendLine(line, "[", 1, ":"))  
-        data["totalList"].append(data["inputList"][inputNum()-1])
-    else:
-        if ";" in line:
-            data["outputList"].append(appendLine(line, start, num, ";"))
-        elif "," in line:
-            data["outputList"].append(appendLine(line, start, num, ","))
-        else:
-            data["outputList"].append(appendLine(line, start, num, "\n"))
-        if oneBit:
-            data["oBitsList"].append(0)
-        else:
-            data["oBitsList"].append(appendLine(line, "[", 1, ":"))  
-        data["totalList"].append(data["outputList"][outputNum()-1])
+    i = 0
+    while(i < len(definition.ports)):
+        if(str(definition.ports[i].direction) == "Direction.OUT"):
+            data["outputList"].append(definition.ports[i].name)
+            data["totalList"].append(definition.ports[i].name)
+            data["oBitsList"].append(len(definition.ports[i].pins)-1)
+        elif (str(definition.ports[i].direction) == "Direction.IN"):
+            data["inputList"].append(definition.ports[i].name)
+            data["totalList"].append(definition.ports[i].name)
+            data["iBitsList"].append(len(definition.ports[i].pins)-1)
+        i = i + 1
 
-#A function to find out what the input/output name is and at which index to start finding the name.
-def findType(line, isInput):
-    if "]" in line:
-        if(line[line.index("]")+1].isspace()):
-            checkEndChar(line, "]", 2, isInput, False)
+#Creates a temporary file for reversed-netlists to find input/output order because many reversed netlists have components that are
+#unable to be read by spydrnet. 
+def parseReversed(file):
+    file = open(file)
+    if(exists("test.v")):
+        os.remove("test.v")
+    newFile = open("test.v", "x")
+
+    i = 0
+
+    for line in file:
+        if "module" in line:
+            newFile.write(line)
+        elif "input" in line:
+            newFile.write(line)
+        elif "output" in line:
+            newFile.write(line)
         else:
-            checkEndChar(line, "]", 1, isInput, False)
-    
-    elif "wire" in line:
-        checkEndChar(line, "e", 2, isInput, True)
-
-    elif "reg" in line:
-        checkEndChar(line, "g", 2, isInput, True)
-
-    else:
-        if(isInput):
-            checkEndChar(line, "input", 6, isInput, True) 
-        else:
-            checkEndChar(line, "output", 6, isInput, True) 
-
-#A function that checks whether the line is a comment or not, then finds if inputs or outputs are in the line.
-#If they are, it calls the other functions to fully parse the line for the names of the inputs/outputs. 
-def parseLine(line):
-    if (line.find("//", 0, 2) == -1):
-        if "input" in line:
-            findType(line, True)
-        if "output" in line:
-            findType(line, False)
+            if (i == 0):
+                i = 1
+                newFile.write(line)
+    file.close()
+    newFile.close()
+    parse(newFile.name)
+    os.remove("test.v")
 
 #A function to generate the intitial testbench. This function takes a sample testbench, fills in missing
 #portions with data parsed earlier, and then adds in randomly generated data for the inputs to be set
@@ -226,15 +212,13 @@ def generateTCL():
             line = line.replace(fileName[fileNum-1], fileName[fileNum])
         TCL.write(line)
 
-        
-
-#The main function that calls all of the functions above and generates the testbench.
-
-openFiles() 
+openFiles()
 
 for x in file:
-    for line in x:
-        parseLine(line)
+    if(x.name.find("reversed") != -1):
+        parseReversed(x.name)
+    else:
+        parse(x.name)
 
     if(exists(PATH + fileName[fileNum] + "/" + fileName[fileNum] + "_tb.v")): #Removes the previously generated testbench if it exists.
         os.remove(PATH + fileName[fileNum] + "/" + fileName[fileNum] + "_tb.v")
@@ -258,5 +242,6 @@ for x in file:
         generateFirstTCL()
     else:
         generateTCL()
-    data = refresh(data) #Sets the data structure back to it's initial state so the next file parsed can store data there.
-    fileNum = fileNum + 1 #Increments to the next file.
+
+    data = refresh(data)
+    fileNum = fileNum + 1
