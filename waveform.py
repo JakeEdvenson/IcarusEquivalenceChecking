@@ -301,7 +301,9 @@ class Waveform_CompareTool(CompareTool):
         os.system(string)
         os.system("vvp " + PATH + "dsn")
         os.system("mv test.vcd " + PATH + REVERSED_NAME + "_temp.vcd")
+        os.system("echo do_initial_zoom_fit 1 >> .gtkwaverc")
         os.system("gtkwave -T " + PATH + REVERSED_NAME + ".tcl -o " + PATH + REVERSED_NAME + "_temp.vcd & gtkwave -T " + PATH + IMPL_NAME + ".tcl -o " + PATH + IMPL_NAME + "_temp.vcd")
+        os.remove(".gtkwaverc")
         os.system("diff " + PATH + IMPL_NAME + ".vcd " + PATH + REVERSED_NAME + ".vcd >> " + PATH + "diff.txt")
 
         file = open(PATH + "diff.txt")
